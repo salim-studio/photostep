@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "mkdir -p /tmp/trunk-bin && curl -sSL https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xz -C /tmp/trunk-bin && rustup target add wasm32-unknown-unknown && /tmp/trunk-bin/trunk build --release",
+  "buildCommand": "export PATH=\"$HOME/.cargo/bin:/rust/bin:$PATH\" && rustup target add wasm32-unknown-unknown && cargo build --target wasm32-unknown-unknown --release && WBV=$(grep -A2 '^name = \"wasm-bindgen\"$' Cargo.lock | grep '^version' | head -1 | cut -d'\"' -f2) && echo \"wasm-bindgen lib version: $WBV\" && cargo install wasm-bindgen-cli --vers $WBV && mkdir -p dist/assets && wasm-bindgen --target web --out-dir dist --out-name photostep target/wasm32-unknown-unknown/release/photostep.wasm && cp web/index.html dist/index.html && cp assets/logo.svg dist/assets/logo.svg && ls -la dist dist/assets",
   "outputDirectory": "dist",
   "framework": null
 }

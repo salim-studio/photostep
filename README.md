@@ -57,18 +57,23 @@ cargo run --release
 
 ### 3) Try it in the browser (web build)
 
-PhotoStep also compiles to WebAssembly and runs fully in the browser:
+PhotoStep also compiles to WebAssembly and runs fully in the browser.
+
+Local preview with [Trunk](https://trunkrs.dev) (needs a local Rust toolchain):
 
 ```sh
 rustup target add wasm32-unknown-unknown
-cargo install trunk
+cargo install trunk --locked
 trunk serve   # local preview at http://127.0.0.1:8080
 ```
 
-The repository ships `index.html`, `Trunk.toml` and `vercel.json`, so pushing
-to [Vercel](https://vercel.com) builds (`trunk build --release`) and serves
-the `dist/` folder automatically — no server needed. Note: the web demo starts
-from a blank canvas; file open/save needs the desktop build.
+On [Vercel](https://vercel.com), `vercel.json` builds without Trunk: it compiles
+the `wasm32-unknown-unknown` target, builds a matching `wasm-bindgen-cli`
+from source (Vercel's older glibc can't run prebuilt Rust binaries), emits the
+JS glue into `dist/`, and serves it as a static site. No server needed.
+
+Note: the web demo starts from a blank canvas; file open/save needs the
+desktop build.
 
 ### 4) Batch processing (no GUI)
 
