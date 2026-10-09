@@ -539,9 +539,10 @@ impl PhotoStepApp {
                     let p1 = rect.min + Vec2::new(s.max.x * self.zoom, s.max.y * self.zoom);
                     ui.painter().rect_stroke(egui::Rect::from_min_max(p0.into(), p1.into()), 0.0, (1.5, Color32::YELLOW), egui::StrokeKind::Middle);
                 }
-                // interactions
+                // interactions (zoom copied so the helper closure doesn't borrow self)
+                let zoom = self.zoom;
                 let to_img = |p: egui::Pos2| {
-                    egui::pos2((p.x - rect.min.x) / self.zoom, (p.y - rect.min.y) / self.zoom)
+                    egui::pos2((p.x - rect.min.x) / zoom, (p.y - rect.min.y) / zoom)
                 };
                 if resp.drag_started() {
                     self.painting = true;
