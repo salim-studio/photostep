@@ -10,7 +10,7 @@ use crate::core::{BlendMode, Document, Layer};
 pub fn load_image(path: &str) -> Result<Document> {
     let bytes = std::fs::read(path).with_context(|| format!("cannot read {path}"))?;
     let decoded = image::load_from_memory(&bytes).with_context(|| format!("cannot decode {path}"))?;
-    let img = apply_exif_orientation(decoded, &bytes).to_rgba8();
+    let img = apply_exif_orientation(decoded, &bytes);
     let (w, h) = (img.width(), img.height());
     let mut doc = Document::new(w, h, [0, 0, 0, 0]);
     doc.layers[0].name = "Background".into();
@@ -20,7 +20,7 @@ pub fn load_image(path: &str) -> Result<Document> {
 
 /// Honor the EXIF orientation flag (phones store rotation here instead of
 /// rotating pixels). Unknown/missing flags leave the image untouched.
-fn apply_exif_orientation(img: image::DynamicImage, bytes: &[u8]) -> image::DynamicImage {
+fn apply_exif_orientation(img: image::DynamicImage, bytes: &[u8]) -> image::RgbaImage {
     use image::imageops::{flip_horizontal, flip_vertical, rotate180, rotate270, rotate90};
     let mut cursor = std::io::Cursor::new(bytes);
     let orientation = exif::Reader::new()
@@ -28,15 +28,16 @@ fn apply_exif_orientation(img: image::DynamicImage, bytes: &[u8]) -> image::Dyna
         .ok()
         .and_then(|ex| ex.get_field(exif::Tag::Orientation, exif::In::PRIMARY).cloned())
         .and_then(|f| f.value.get_uint(0));
+    let rgba = img.to_rgba8();
     match orientation.unwrap_or(1) {
-        2 => flip_horizontal(&img),
-        3 => rotate180(&img),
-        4 => flip_vertical(&img),
-        5 => flip_horizontal(&rotate90(&img)),
-        6 => rotate90(&img),
-        7 => flip_horizontal(&rotate270(&img)),
-        8 => rotate270(&img),
-        _ => img,
+        2 => flip_horizontal(&rgba),
+        3 => rotate180(&rgba),
+        4 => flip_vertical(&rgba),
+        5 => flip_horizontal(&rotate90(&rgba)),
+        6 => rotate90(&rgba),
+        7 => flip_horizontal(&rotate270(&rgba)),
+        8 => rotate270(&rgba),
+        _ => rgba,
     }
 }
 
