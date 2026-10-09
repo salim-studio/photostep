@@ -466,7 +466,8 @@ pub fn blur_channel(src: &[u8], w: usize, h: usize, radius: usize) -> Vec<u8> {
 /// Fast gaussian approximation: 3x separable box blur. Radius clamped for speed.
 pub fn gaussian_blur(doc: &mut Document, radius: u32) {
     let r = (radius as usize).clamp(1, 64);
-    gaussian_blur_buf(active_pixels(doc), doc.width as usize, doc.height as usize, r);
+    let (w, h) = (doc.width as usize, doc.height as usize);
+    gaussian_blur_buf(active_pixels(doc), w, h, r);
 }
 
 pub fn gaussian_blur_buf(buf: &mut [u8], w: usize, h: usize, r: usize) {

@@ -903,7 +903,7 @@ impl History {
     pub fn goto(&mut self, current: &Document, index: usize) -> Option<Document> {
         let mut doc = current.clone();
         while self.undo.len() > index {
-            doc = self.undo(doc)?;
+            doc = self.undo(&doc)?;
         }
         while self.undo.len() < index && self.can_redo() {
             doc = self.redo(&doc)?;
