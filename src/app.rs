@@ -182,11 +182,6 @@ impl PhotoStepApp {
         matches!(self.doc.active_layer().kind, LayerKind::Pixel)
     }
 
-    /// True when the active layer holds paintable pixels.
-    fn active_is_pixel(&self) -> bool {
-        matches!(self.doc.active_layer().kind, LayerKind::Pixel)
-    }
-
     /// Run a pixel op on the paint target, masked by the selection when present.
     fn apply_layer_op(&mut self, label: &str, f: impl FnOnce(&mut Document)) {
         if !self.ensure_pixel_target() {
@@ -1620,7 +1615,11 @@ impl PhotoStepApp {
                             Tool::ShapeEllipse => {
                                 if let Some((x0, y0)) = self.shape_start {
                                     let r = egui::Rect::from_two_pos(at(x0, y0), at(ip.x, ip.y));
-                                    ui.painter().ellipse_stroke(r.center(), r.size() / 2.0, (1.5, Color32::WHITE));
+                                    ui.painter().add(egui::Shape::ellipse_stroke(
+                                        r.center(),
+                                        r.size() / 2.0,
+                                        (1.5, Color32::WHITE),
+                                    ));
                                 }
                             }
                             Tool::ShapeLine => {
