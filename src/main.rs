@@ -44,6 +44,9 @@ fn apply_op(doc: &mut core::Document, spec: &str) -> anyhow::Result<()> {
         None => (spec.trim().to_lowercase(), String::new()),
     };
     let num = |d: &str| d.parse::<f32>().unwrap_or(0.0);
+    let csv = |d: &str| -> Vec<f32> {
+        d.split(',').map(|x| x.trim().parse::<f32>().unwrap_or(0.0)).collect()
+    };
     match name.as_str() {
         "brightness" => ops::brightness(doc, num(&arg) as i16),
         "contrast" => ops::contrast(doc, num(&arg)),
@@ -63,6 +66,41 @@ fn apply_op(doc: &mut core::Document, spec: &str) -> anyhow::Result<()> {
         "noise" => ops::add_noise(doc, num(&arg) as u8),
         "vignette" => ops::vignette(doc, if arg.is_empty() { 0.6 } else { num(&arg) }),
         "autocontrast" => ops::auto_contrast(doc),
+        "levels" => {
+            let v = csv(&arg);
+            let lo = (*v.first().unwrap_or(&0.0)).clamp(0.0, 255.0) as u8;
+            let hi = (*v.get(1).unwrap_or(&255.0)).clamp(0.0, 255.0) as u8;
+            ops::levels(doc, lo, hi, *v.get(2).unwrap_or(&1.0));
+        }
+        "curves" => ops::curves(doc, &[(0, 0), (64, 56), (192, 200), (255, 255)]),
+        "colorbal" => {
+            let v = csv(&arg);
+            ops::color_balance(
+                doc,
+                *v.first().unwrap_or(&0.0) as i16,
+                *v.get(1).unwrap_or(&0.0) as i16,
+                *v.get(2).unwrap_or(&0.0) as i16,
+            );
+        }
+        "blackwhite" | "bw" => ops::black_white(doc, 0.299, 0.587, 0.114),
+        "photofilter" => ops::photo_filter(doc, [255, 128, 0], if arg.is_empty() { 0.25 } else { num(&arg) }),
+        "gradmap" => ops::gradient_map(doc, [0, 0, 0], [255, 255, 255]),
+        "shadowhi" => {
+            let v = csv(&arg);
+            ops::shadows_highlights(doc, *v.first().unwrap_or(&0.0), *v.get(1).unwrap_or(&0.0));
+        }
+        "motion" => {
+            let v = csv(&arg);
+            ops::motion_blur(doc, *v.first().unwrap_or(&25.0), (*v.get(1).unwrap_or(&12.0)) as u32);
+        }
+        "radial" => ops::radial_blur(doc, if arg.is_empty() { 30.0 } else { num(&arg) }),
+        "median" => ops::median(doc, num(&arg) as u32),
+        "highpass" => ops::high_pass(doc, num(&arg) as u32),
+        "rotate" => ops::rotate_arbitrary(doc, num(&arg)),
+        "scale" => {
+            let v = csv(&arg);
+            ops::scale_content(doc, *v.first().unwrap_or(&100.0), *v.get(1).unwrap_or(&100.0));
+        }
         "fliph" => ops::flip_horizontal(doc),
         "flipv" => ops::flip_vertical(doc),
         "rot90" => ops::rotate90_cw(doc),
@@ -75,8 +113,11 @@ fn apply_op(doc: &mut core::Document, spec: &str) -> anyhow::Result<()> {
 fn run_headless(cli: &Cli) -> anyhow::Result<()> {
     let inp = cli.input.clone().expect("need --input");
     let out = cli.out.clone().expect("need --out");
-    let mut doc = if inp.ends_with(".pstep") || inp.ends_with(".json") {
+    let lower = inp.to_lowercase();
+    let mut doc = if lower.ends_with(".pstep") || lower.ends_with(".json") {
         io::load_project(&inp)?
+    } else if lower.ends_with(".psd") {
+        io::load_psd(&inp)?
     } else {
         io::load_image(&inp)?
     };

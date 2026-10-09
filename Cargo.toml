@@ -1,6 +1,6 @@
 [package]
 name = "photostep"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "PhotoStep — fast layer-based image editor in pure Rust"
 authors = ["salim-slimani"]
@@ -22,6 +22,7 @@ serde_json = "1"
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 log = "0.4"
+psd = "0.3"
 
 # native-only: blocking file dialogs (the web build uses a placeholder message)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

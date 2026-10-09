@@ -60,7 +60,7 @@ pub enum PaintTarget {
 
 // ---------- PhotoStep brand identity ----------
 pub const BRAND_NAME: &str = "PhotoStep";
-pub const BRAND_VERSION: &str = "0.1.0";
+pub const BRAND_VERSION: &str = "0.2.0";
 pub const BRAND_COPYRIGHT: &str = "© 2026 salim-slimani. All rights reserved.";
 pub const BRAND_ORANGE: Color32 = Color32::from_rgb(255, 90, 40);
 pub const BRAND_AMBER: Color32 = Color32::from_rgb(255, 176, 58);
@@ -705,7 +705,7 @@ impl PhotoStepApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn open_dialog(&mut self) {
         if let Some(p) = rfd::FileDialog::new()
-            .add_filter("images", &["png", "jpg", "jpeg", "tiff", "bmp", "webp", "gif", "qoi", "pstep", "json"])
+            .add_filter("images", &["png", "jpg", "jpeg", "tiff", "bmp", "webp", "gif", "qoi", "psd", "pstep", "json"])
             .pick_file()
         {
             let s = p.to_string_lossy().to_string();
@@ -719,8 +719,11 @@ impl PhotoStepApp {
     }
 
     fn open_path(&mut self, s: &str) {
-        let r = if s.ends_with(".pstep") || s.ends_with(".json") {
+        let lower = s.to_lowercase();
+        let r = if lower.ends_with(".pstep") || lower.ends_with(".json") {
             io::load_project(s)
+        } else if lower.ends_with(".psd") {
+            io::load_psd(s)
         } else {
             io::load_image(s)
         };
