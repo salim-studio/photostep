@@ -55,7 +55,22 @@ cd photostep
 cargo run --release
 ```
 
-### 3) Batch processing (no GUI)
+### 3) Try it in the browser (web build)
+
+PhotoStep also compiles to WebAssembly and runs fully in the browser:
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install trunk
+trunk serve   # local preview at http://127.0.0.1:8080
+```
+
+The repository ships `index.html`, `Trunk.toml` and `vercel.json`, so pushing
+to [Vercel](https://vercel.com) builds (`trunk build --release`) and serves
+the `dist/` folder automatically — no server needed. Note: the web demo starts
+from a blank canvas; file open/save needs the desktop build.
+
+### 4) Batch processing (no GUI)
 
 ```powershell
 cargo run --release -- --input in.png --out out.png --op "brightness:20" --op "contrast:25" --op "blur:4" --op sharpen:1.2

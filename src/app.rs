@@ -170,6 +170,7 @@ impl PhotoStepApp {
         self.tex = None; // force re-upload
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn open_dialog(&mut self) {
         if let Some(p) = rfd::FileDialog::new()
             .add_filter("images", &["png", "jpg", "jpeg", "tiff", "bmp", "webp", "gif", "qoi", "pstep", "json"])
@@ -178,6 +179,11 @@ impl PhotoStepApp {
             let s = p.to_string_lossy().to_string();
             self.open_path(&s);
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn open_dialog(&mut self) {
+        self.msg = "File dialogs need the desktop build — the web demo starts from a blank canvas.".into();
     }
 
     fn open_path(&mut self, s: &str) {
@@ -199,6 +205,7 @@ impl PhotoStepApp {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn save_dialog(&mut self) {
         if let Some(p) = rfd::FileDialog::new()
             .add_filter("png", &["png"])
@@ -217,6 +224,11 @@ impl PhotoStepApp {
                 Err(e) => format!("Save failed: {e:#}"),
             };
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn save_dialog(&mut self) {
+        self.msg = "Saving files needs the desktop build — the web demo is for trying the tools.".into();
     }
 
     fn menu_bar(&mut self, ctx: &egui::Context) {

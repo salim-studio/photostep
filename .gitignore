@@ -1,3 +1,4 @@
 /target
+/dist
 *.pstep
 .DS_Store

@@ -1,0 +1,7 @@
+# Trunk builds the web (WebAssembly) version of PhotoStep from index.html.
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+ignore = ["target", "dist"]

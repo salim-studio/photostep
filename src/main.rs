@@ -1,14 +1,19 @@
 //! PhotoStep — fast layer-based image editor in Rust.
-//! GUI (default): `photostep` or `photostep gui`
+//! Desktop GUI (default): `photostep` — native window via eframe.
+//! Web: compiled to WebAssembly and served from `index.html` (see Trunk.toml).
 //! Headless: `photostep --input in.png --out out.png --op "brightness:20" --op "blur:4"`
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console on Windows release
 
 mod app;
 mod core;
 mod io;
 mod ops;
 
+#[cfg(not(target_arch = "wasm32"))]
 use clap::{Parser, Subcommand};
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Parser, Debug)]
 #[command(name = "photostep", version, about = "PhotoStep — fast layer-based image editor in Rust")]
 struct Cli {
@@ -25,12 +30,14 @@ struct Cli {
     cmd: Option<Cmd>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Subcommand, Debug)]
 enum Cmd {
     /// Launch the desktop GUI
     Gui,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn apply_op(doc: &mut core::Document, spec: &str) -> anyhow::Result<()> {
     let (name, arg) = match spec.split_once(':') {
         Some((a, b)) => (a.trim().to_lowercase(), b.trim().to_string()),
@@ -64,6 +71,7 @@ fn apply_op(doc: &mut core::Document, spec: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn run_headless(cli: &Cli) -> anyhow::Result<()> {
     let inp = cli.input.clone().expect("need --input");
     let out = cli.out.clone().expect("need --out");
@@ -84,6 +92,8 @@ fn run_headless(cli: &Cli) -> anyhow::Result<()> {
     Ok(())
 }
 
+// When compiling natively (desktop GUI + CLI):
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let headless = cli.input.is_some() || cli.out.is_some();
@@ -101,4 +111,51 @@ fn main() -> anyhow::Result<()> {
     )
     .map_err(|e| anyhow::anyhow!("gui error: {e}"))?;
     Ok(())
+}
+
+// When compiling to web (WebAssembly via trunk):
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    use eframe::wasm_bindgen::JsCast as _;
+
+    // Redirect `log` messages to `console.log` and friends:
+    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
+
+    let web_options = eframe::WebOptions::default();
+
+    wasm_bindgen_futures::spawn_local(async {
+        let document = web_sys::window()
+            .expect("No window")
+            .document()
+            .expect("No document");
+
+        let canvas = document
+            .get_element_by_id("the_canvas_id")
+            .expect("Failed to find the_canvas_id")
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .expect("the_canvas_id was not a HtmlCanvasElement");
+
+        let start_result = eframe::WebRunner::new()
+            .start(
+                canvas,
+                web_options,
+                Box::new(|cc| Ok(Box::new(app::PhotoStepApp::new(cc)))),
+            )
+            .await;
+
+        // Remove the loading text and spinner:
+        if let Some(loading_text) = document.get_element_by_id("loading_text") {
+            match start_result {
+                Ok(()) => {
+                    loading_text.remove();
+                }
+                Err(err) => {
+                    loading_text.set_inner_html(
+                        "<p> The app has crashed. See the developer console for details. </p>",
+                    );
+                    panic!("Failed to start eframe: {err:?}");
+                }
+            }
+        }
+    });
 }
