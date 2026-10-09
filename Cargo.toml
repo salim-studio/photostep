@@ -1,6 +1,6 @@
 [package]
 name = "photostep"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "PhotoStep — fast layer-based image editor in pure Rust"
 authors = ["salim-slimani"]
@@ -23,6 +23,7 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 log = "0.4"
 psd = "0.3"
+kamadak-exif = "0.5"
 
 # native-only: blocking file dialogs (the web build uses a placeholder message)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

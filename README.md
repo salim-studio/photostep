@@ -11,7 +11,7 @@ on the desktop, in the browser, and on the command line.</p>
 <p align="center">
   <a href="https://github.com/salim-studio/photostep/actions/workflows/deploy-pages.yml"><img src="https://github.com/salim-studio/photostep/actions/workflows/deploy-pages.yml/badge.svg" alt="Pages build status" /></a>
   <a href="https://salim-studio.github.io/photostep/"><img src="https://img.shields.io/badge/demo-live-FF5A28?logo=googlechrome&logoColor=white" alt="Live demo" /></a>
-  <img src="https://img.shields.io/badge/version-0.2.0-FFB03A" alt="Version 0.2.0" />
+  <img src="https://img.shields.io/badge/version-0.2.1-FFB03A" alt="Version 0.2.1" />
   <img src="https://img.shields.io/badge/license-MIT-35D0C5" alt="MIT license" />
   <img src="https://img.shields.io/badge/100%25_Rust-74105e?logo=rust" alt="100% Rust" />
 </p>
@@ -36,6 +36,14 @@ palette (dark ink surfaces, step-orange selection and actions).
 - **Fast Gaussian:** 3× separable box-blur approximation instead of heavy convolution.
 - **Fast paths** for plain Normal compositing, no wasted float math.
 - **Single texture upload** — the canvas re-uploads only when pixels change, not every frame.
+
+## Import & output quality
+
+- **EXIF auto-orientation** — phone photos open upright, pixels untouched otherwise
+- **Lanczos-3 resampling** on every layer resize for maximum sharpness
+- **JPEG exports at quality 93** (visually lossless, sane file sizes)
+- **Dithered gradients** (±1 LSB hash dithering kills banding in Gradient Map and manual gradients)
+- **Interpolated brush strokes** — dab spacing adapts to speed, so fast strokes stay silky
 
 ## Features
 

@@ -5,13 +5,39 @@ use anyhow::{Context, Result};
 use crate::core::{BlendMode, Document, Layer};
 
 /// Load any image format supported by `image` crate into a new document.
+/// Applies the EXIF orientation flag so phone photos open upright, and
+/// resamples nothing — pixels stay exactly as decoded.
 pub fn load_image(path: &str) -> Result<Document> {
-    let img = image::open(path).with_context(|| format!("cannot open {path}"))?.to_rgba8();
+    let bytes = std::fs::read(path).with_context(|| format!("cannot read {path}"))?;
+    let decoded = image::load_from_memory(&bytes).with_context(|| format!("cannot decode {path}"))?;
+    let img = apply_exif_orientation(decoded, &bytes).to_rgba8();
     let (w, h) = (img.width(), img.height());
     let mut doc = Document::new(w, h, [0, 0, 0, 0]);
     doc.layers[0].name = "Background".into();
     doc.layers[0].pixels = img.into_raw();
     Ok(doc)
+}
+
+/// Honor the EXIF orientation flag (phones store rotation here instead of
+/// rotating pixels). Unknown/missing flags leave the image untouched.
+fn apply_exif_orientation(img: image::DynamicImage, bytes: &[u8]) -> image::DynamicImage {
+    use image::imageops::{flip_horizontal, flip_vertical, rotate180, rotate270, rotate90};
+    let mut cursor = std::io::Cursor::new(bytes);
+    let orientation = exif::Reader::new()
+        .read_from_container(&mut cursor)
+        .ok()
+        .and_then(|ex| ex.get_field(exif::Tag::Orientation, exif::In::PRIMARY).cloned())
+        .and_then(|f| f.value.get_uint(0));
+    match orientation.unwrap_or(1) {
+        2 => flip_horizontal(&img),
+        3 => rotate180(&img),
+        4 => flip_vertical(&img),
+        5 => flip_horizontal(&rotate90(&img)),
+        6 => rotate90(&img),
+        7 => flip_horizontal(&rotate270(&img)),
+        8 => rotate270(&img),
+        _ => img,
+    }
 }
 
 /// Load a Photoshop PSD file: every pixel layer becomes a PhotoStep layer
@@ -57,13 +83,18 @@ pub fn load_psd_bytes(bytes: &[u8]) -> Result<Document> {
 }
 
 /// Save flattened composite. Format deduced from extension.
+/// JPEG exports at quality 93 (visually lossless, sane file sizes).
 pub fn save_image(doc: &Document, path: &str) -> Result<()> {
     let flat = doc.composite();
     let buf: image::RgbaImage =
         image::ImageBuffer::from_raw(doc.width, doc.height, flat).context("bad buffer")?;
     if path.ends_with(".jpg") || path.ends_with(".jpeg") {
         let rgb = image::DynamicImage::ImageRgba8(buf).to_rgb8();
-        rgb.save(path)?;
+        let (w, h) = (rgb.width(), rgb.height());
+        let file = std::fs::File::create(path)?;
+        let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(file, 93);
+        use image::ImageEncoder as _;
+        enc.write_image(rgb.as_raw(), w, h, image::ExtendedColorType::Rgb8)?;
     } else {
         buf.save(path)?;
     }

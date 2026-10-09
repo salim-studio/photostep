@@ -211,11 +211,20 @@ pub fn channel_mixer_buf(buf: &mut [u8], r: [f32; 3], g: [f32; 3], b: [f32; 3]) 
     });
 }
 
+/// Tiny deterministic hash noise in [-0.5, 0.5): kills banding when added at ±1 LSB.
+#[inline]
+pub fn hash_noise(x: u32, y: u32) -> f32 {
+    let mut h = x.wrapping_mul(374761393).wrapping_add(y.wrapping_mul(668265263));
+    h = (h ^ (h >> 13)).wrapping_mul(1274126177);
+    ((h ^ (h >> 16)) % 1024) as f32 / 1024.0 - 0.5
+}
+
 pub fn gradient_map_buf(buf: &mut [u8], dark: [u8; 3], light: [u8; 3]) {
-    buf.par_chunks_exact_mut(4).for_each(|p| {
+    buf.par_chunks_exact_mut(4).enumerate().for_each(|(i, p)| {
         let l = (0.299 * p[0] as f32 + 0.587 * p[1] as f32 + 0.114 * p[2] as f32) / 255.0;
-        for i in 0..3 {
-            p[i] = clamp_u8(dark[i] as f32 * (1.0 - l) + light[i] as f32 * l);
+        let dh = hash_noise(i as u32, 0x51F7) * 2.0;
+        for c in 0..3 {
+            p[c] = clamp_u8(dark[c] as f32 * (1.0 - l) + light[c] as f32 * l + dh);
         }
     });
 }

@@ -425,14 +425,14 @@ impl Layer {
             let img: image::RgbaImage =
                 image::ImageBuffer::from_raw(self.width, self.height, std::mem::take(&mut self.pixels))
                     .unwrap_or_else(|| image::ImageBuffer::new(self.width, self.height));
-            let resized = image::imageops::resize(&img, w, h, image::imageops::FilterType::Triangle);
+            let resized = image::imageops::resize(&img, w, h, image::imageops::FilterType::Lanczos3);
             self.pixels = resized.into_raw();
         }
         if let Some(m) = self.mask.take() {
             let img: image::ImageBuffer<image::Luma<u8>, Vec<u8>> =
                 image::ImageBuffer::from_raw(self.width, self.height, m)
                     .unwrap_or_else(|| image::ImageBuffer::new(self.width, self.height));
-            let resized = image::imageops::resize(&img, w, h, image::imageops::FilterType::Triangle);
+            let resized = image::imageops::resize(&img, w, h, image::imageops::FilterType::Lanczos3);
             self.mask = Some(resized.into_raw());
         }
         self.width = w;

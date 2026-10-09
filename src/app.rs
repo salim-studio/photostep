@@ -49,6 +49,26 @@ impl Tool {
     fn all() -> &'static [Tool] {
         &[Tool::Move, Tool::Brush, Tool::Eraser, Tool::CloneStamp, Tool::Fill, Tool::Gradient, Tool::Eyedropper, Tool::SelectRect, Tool::SelectEllipse, Tool::MagicWand, Tool::ShapeRect, Tool::ShapeEllipse, Tool::ShapeLine, Tool::Crop, Tool::Zoom]
     }
+
+    fn tip(self) -> &'static str {
+        match self {
+            Tool::Move => "Drag to move the active layer (V)",
+            Tool::Brush => "Soft paintbrush (B)",
+            Tool::Eraser => "Soft eraser (E)",
+            Tool::CloneStamp => "Copy from an Alt-clicked source (S)",
+            Tool::Fill => "Fill the layer or selection (G)",
+            Tool::Gradient => "Drag for a foreground → background blend",
+            Tool::Eyedropper => "Pick a color from the canvas (I)",
+            Tool::SelectRect => "Rectangular marquee (M)",
+            Tool::SelectEllipse => "Elliptical marquee",
+            Tool::MagicWand => "Select similar colors (W) — Shift adds",
+            Tool::ShapeRect => "Filled rectangle on a new layer",
+            Tool::ShapeEllipse => "Filled ellipse on a new layer",
+            Tool::ShapeLine => "Thick line on a new layer",
+            Tool::Crop => "Drag, release to crop (C)",
+            Tool::Zoom => "Click to zoom, Shift-click to zoom out (Z)",
+        }
+    }
 }
 
 /// Brush paint target: pixels or the layer mask.
@@ -61,22 +81,38 @@ pub enum PaintTarget {
 
 // ---------- PhotoStep brand identity ----------
 pub const BRAND_NAME: &str = "PhotoStep";
-pub const BRAND_VERSION: &str = "0.2.0";
+pub const BRAND_VERSION: &str = "0.2.1";
 pub const BRAND_COPYRIGHT: &str = "© 2026 salim-slimani. All rights reserved.";
 pub const BRAND_ORANGE: Color32 = Color32::from_rgb(255, 90, 40);
 pub const BRAND_AMBER: Color32 = Color32::from_rgb(255, 176, 58);
 pub const BRAND_AQUA: Color32 = Color32::from_rgb(53, 208, 197);
 
-/// Apply the PhotoStep visual identity: dark ink surfaces, step-orange accents.
+/// Apply the PhotoStep visual identity: deep-ink surfaces, step-orange accents.
 fn apply_brand_theme(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();
+    style.visuals.panel_fill = Color32::from_rgb(24, 24, 40);
+    style.visuals.window_fill = Color32::from_rgb(28, 28, 46);
+    style.visuals.faint_bg_color = Color32::from_rgb(37, 37, 60);
+    style.visuals.extreme_bg_color = Color32::from_rgb(13, 13, 25);
     style.visuals.selection.bg_fill = BRAND_ORANGE;
     style.visuals.selection.stroke = egui::Stroke::new(1.0, Color32::WHITE);
     style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(255, 110, 62);
     style.visuals.widgets.active.bg_fill = BRAND_ORANGE;
     style.visuals.widgets.open.bg_fill = Color32::from_rgb(60, 60, 86);
+    for w in [
+        &mut style.visuals.widgets.noninteractive,
+        &mut style.visuals.widgets.inactive,
+        &mut style.visuals.widgets.hovered,
+        &mut style.visuals.widgets.active,
+        &mut style.visuals.widgets.open,
+    ] {
+        w.corner_radius = egui::CornerRadius::same(6);
+    }
     style.visuals.window_corner_radius = egui::CornerRadius::same(10);
     style.visuals.menu_corner_radius = egui::CornerRadius::same(8);
+    style.spacing.item_spacing = Vec2::new(6.0, 5.0);
+    style.spacing.button_padding = Vec2::new(8.0, 4.0);
+    style.spacing.indent = 18.0;
     ctx.set_style(style);
 }
 
@@ -102,6 +138,7 @@ pub struct PhotoStepApp {
     stroke_snap: Option<Vec<u8>>, // layer snapshot at stroke start (clone/move)
     move_start: Option<(f32, f32)>,
     drag_cur: Option<(f32, f32)>,
+    last_dab: Option<(f32, f32)>, // stroke interpolation anchor
     grad_start: Option<(f32, f32)>,
     shape_start: Option<(f32, f32)>,
     curve_grab: Option<usize>,
@@ -143,6 +180,7 @@ impl PhotoStepApp {
             stroke_snap: None,
             move_start: None,
             drag_cur: None,
+            last_dab: None,
             grad_start: None,
             shape_start: None,
             curve_grab: None,
@@ -337,8 +375,9 @@ impl PhotoStepApp {
             for x in 0..w {
                 let t = (((x as f32 - x0) * dx + (y as f32 - y0) * dy) / len2).clamp(0.0, 1.0);
                 let mut c = [0u8; 4];
+                let dh = ops::hash_noise(x, y) * 2.0; // dither kills banding
                 for i in 0..3 {
-                    c[i] = (fg[i] as f32 * (1.0 - t) + bgc[i] as f32 * t).round() as u8;
+                    c[i] = (fg[i] as f32 * (1.0 - t) + bgc[i] as f32 * t + dh).round().clamp(0.0, 255.0) as u8;
                 }
                 c[3] = 255;
                 let o = ((y * w + x) * 4) as usize;
@@ -972,13 +1011,20 @@ impl PhotoStepApp {
     fn left_tools(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tools").exact_width(148.0).show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                ui.label(egui::RichText::new("◧ PHOTOSTEP").size(17.0).strong().color(BRAND_ORANGE));
-                ui.label(egui::RichText::new(format!("v{}", BRAND_VERSION)).small().weak());
+                ui.label(egui::RichText::new("◧ PHOTOSTEP").size(19.0).strong().color(BRAND_ORANGE));
+                ui.label(egui::RichText::new(format!("STUDIO · v{}", BRAND_VERSION)).small().color(BRAND_AMBER));
             });
             ui.separator();
-            ui.heading("Tools");
-            for t in Tool::all() {
-                ui.selectable_value(&mut self.tool, *t, t.name());
+            for (group, tools) in [
+                ("PAINT", &[Tool::Move, Tool::Brush, Tool::Eraser, Tool::CloneStamp, Tool::Fill, Tool::Gradient][..]),
+                ("SELECT", &[Tool::Eyedropper, Tool::SelectRect, Tool::SelectEllipse, Tool::MagicWand][..]),
+                ("SHAPE", &[Tool::ShapeRect, Tool::ShapeEllipse, Tool::ShapeLine, Tool::Crop][..]),
+                ("VIEW", &[Tool::Zoom][..]),
+            ] {
+                ui.label(egui::RichText::new(group).small().weak());
+                for t in tools {
+                    ui.selectable_value(&mut self.tool, *t, t.name()).on_hover_text(t.tip());
+                }
             }
             ui.separator();
             ui.label("Brush size");
@@ -1410,7 +1456,8 @@ impl PhotoStepApp {
             let size = Vec2::new(self.doc.width as f32 * self.zoom, self.doc.height as f32 * self.zoom);
             egui::ScrollArea::both().show(ui, |ui| {
                 let (rect, resp) = ui.allocate_exact_size(size, egui::Sense::click_and_drag());
-                // checkerboard for transparency
+                // floating canvas: soft shadow frame + checkerboard for transparency
+                ui.painter().rect_filled(rect.expand(10.0), 12.0, Color32::from_rgba_unmultiplied(0, 0, 0, 90));
                 ui.painter().rect_filled(rect, 0.0, Color32::from_gray(32));
                 ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
                 // selection overlay
@@ -1444,6 +1491,7 @@ impl PhotoStepApp {
                         self.sel_start = Some((ip.x, ip.y));
                         self.move_start = Some((ip.x, ip.y));
                         self.drag_cur = Some((ip.x, ip.y));
+                        self.last_dab = Some((ip.x, ip.y));
                         self.grad_start = Some((ip.x, ip.y));
                         self.shape_start = Some((ip.x, ip.y));
                         if matches!(self.tool, Tool::Brush) {
@@ -1459,9 +1507,25 @@ impl PhotoStepApp {
                         let ip = to_img(p);
                         self.drag_cur = Some((ip.x, ip.y));
                         match self.tool {
-                            Tool::Brush => self.apply_brush(ip, false),
-                            Tool::Eraser => self.apply_brush(ip, true),
-                            Tool::CloneStamp => self.clone_dab(ip.x, ip.y),
+                            // interpolated dabs: smooth lines even on fast strokes
+                            Tool::Brush | Tool::Eraser | Tool::CloneStamp => {
+                                let erase = matches!(self.tool, Tool::Eraser);
+                                let spacing = (self.brush_size / 5.0).max(1.5);
+                                let (px, py) = self.last_dab.unwrap_or((ip.x, ip.y));
+                                let dist = ((ip.x - px).powi(2) + (ip.y - py).powi(2)).sqrt();
+                                let steps = ((dist / spacing).floor() as usize).max(1);
+                                for i in 1..=steps {
+                                    let t = i as f32 / steps as f32;
+                                    let qx = px + (ip.x - px) * t;
+                                    let qy = py + (ip.y - py) * t;
+                                    if matches!(self.tool, Tool::CloneStamp) {
+                                        self.clone_dab(qx, qy);
+                                    } else {
+                                        self.apply_brush(egui::pos2(qx, qy), erase);
+                                    }
+                                }
+                                self.last_dab = Some((ip.x, ip.y));
+                            }
                             Tool::Move => {
                                 if let Some((ox, oy)) = self.move_start {
                                     self.move_dab(ip.x - ox, ip.y - oy);
@@ -1518,6 +1582,7 @@ impl PhotoStepApp {
                     self.grad_start = None;
                     self.shape_start = None;
                     self.drag_cur = None;
+                    self.last_dab = None;
                     self.move_start = None;
                     // re-upload once
                     ctx.request_repaint();
@@ -1677,8 +1742,9 @@ impl eframe::App for PhotoStepApp {
         }
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(format!("📐 {}×{}  •  {} layers  •  🔍 {:.0}%  •  🖌 {:?}",
-                    self.doc.width, self.doc.height, self.doc.layers.len(), self.zoom * 100.0, self.tool));
+                ui.label(egui::RichText::new(format!("◧ {:?}", self.tool)).strong().color(BRAND_ORANGE));
+                ui.label(format!("📐 {}×{}  •  {} layers  •  🔍 {:.0}%",
+                    self.doc.width, self.doc.height, self.doc.layers.len(), self.zoom * 100.0));
                 ui.separator();
                 ui.label(&self.msg);
             });
