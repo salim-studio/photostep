@@ -2,7 +2,7 @@
 //! Left: toolbox. Center: canvas. Right: layers + adjustments. Top: menu. Bottom: status.
 
 use egui::{Color32, TextureHandle, Vec2};
-use crate::core::{BlendMode, Document, History};
+use crate::core::{BlendMode, Document, History, LayerKind};
 use crate::{io, ops};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -100,8 +100,32 @@ impl PhotoStepApp {
         }
     }
 
-    fn checkpoint(&mut self) {
-        self.history.push(&self.doc);
+    fn checkpoint(&mut self, label: &str) {
+        self.history.push(label, &self.doc);
+    }
+
+    /// Point `active` at the nearest pixel layer (paint/ops target).
+    /// Adjustment layers are non-destructive, so paint redirects below them.
+    /// Returns false + status message when there is no pixel layer.
+    fn ensure_pixel_target(&mut self) -> bool {
+        match self.doc.paint_target() {
+            Some(i) => {
+                if i != self.doc.active && self.doc.active_layer().is_adjustment() {
+                    self.doc.active = i;
+                    self.msg = "Adjustment layers stay editable — painted on the pixel layer below.".into();
+                }
+                true
+            }
+            None => {
+                self.msg = "No pixel layer to edit — add a layer first.".into();
+                false
+            }
+        }
+    }
+
+    /// True when the active layer holds paintable pixels.
+    fn active_is_pixel(&self) -> bool {
+        matches!(self.doc.active_layer().kind, LayerKind::Pixel)
     }
 
     fn undo(&mut self) {
@@ -134,7 +158,13 @@ impl PhotoStepApp {
     }
 
     fn apply_brush(&mut self, img_pos: egui::Pos2, erase: bool) {
+        if self.doc.paint_target().is_none() {
+            return;
+        }
         let layer = self.doc.active_layer_mut();
+        if layer.pixels.is_empty() {
+            return;
+        }
         let r = (self.brush_size / 2.0).max(1.0);
         let cx = img_pos.x;
         let cy = img_pos.y;
@@ -194,7 +224,7 @@ impl PhotoStepApp {
         };
         match r {
             Ok(d) => {
-                self.checkpoint();
+                self.checkpoint("Open");
                 let (w, h) = (d.width, d.height);
                 self.doc = d;
                 self.tex = None;
@@ -236,7 +266,7 @@ impl PhotoStepApp {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
                     if ui.button("🆕 New  (white 1280×800)").clicked() {
-                        self.checkpoint();
+                        self.checkpoint("New document");
                         self.doc = Document::new(1280, 800, [255, 255, 255, 255]);
                         self.tex = None;
                         ui.close();
@@ -260,7 +290,7 @@ impl PhotoStepApp {
                         ui.close();
                     }
                     if ui.button("⧉ Duplicate layer  (Ctrl+J)").clicked() {
-                        self.checkpoint();
+                        self.checkpoint("Duplicate layer");
                         self.doc.duplicate_active();
                         self.tex = None;
                         ui.close();
@@ -273,85 +303,107 @@ impl PhotoStepApp {
                         ("Auto Contrast", ops::auto_contrast as fn(&mut Document)),
                     ] {
                         if ui.button(label).clicked() {
-                            self.checkpoint();
-                            f(&mut self.doc);
-                            self.tex = None;
+                            if self.ensure_pixel_target() {
+                                self.checkpoint(&format!("Image › {label}"));
+                                f(&mut self.doc);
+                                self.tex = None;
+                            }
                             ui.close();
                         }
                     }
                     if ui.button("Rotate 90° CW").clicked() {
-                        self.checkpoint();
+                        self.checkpoint("Rotate 90° CW");
                         ops::rotate90_cw(&mut self.doc);
                         self.tex = None;
                         ui.close();
                     }
                     if ui.button("Flip Horizontal").clicked() {
-                        self.checkpoint();
-                        ops::flip_horizontal(&mut self.doc);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Flip horizontal");
+                            ops::flip_horizontal(&mut self.doc);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                     if ui.button("Flip Vertical").clicked() {
-                        self.checkpoint();
-                        ops::flip_vertical(&mut self.doc);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Flip vertical");
+                            ops::flip_vertical(&mut self.doc);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                 });
                 ui.menu_button("Filter", |ui| {
                     if ui.button("Blur more").clicked() {
-                        self.checkpoint();
-                        ops::gaussian_blur(&mut self.doc, 6);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Gaussian blur");
+                            ops::gaussian_blur(&mut self.doc, 6);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                     if ui.button("Sharpen").clicked() {
-                        self.checkpoint();
-                        ops::sharpen(&mut self.doc, 1.2);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Sharpen");
+                            ops::sharpen(&mut self.doc, 1.2);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                     if ui.button("Find Edges").clicked() {
-                        self.checkpoint();
-                        ops::edge_detect(&mut self.doc);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Find edges");
+                            ops::edge_detect(&mut self.doc);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                     if ui.button("Emboss").clicked() {
-                        self.checkpoint();
-                        ops::emboss(&mut self.doc);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Emboss");
+                            ops::emboss(&mut self.doc);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                     if ui.button("Pixelate ×8").clicked() {
-                        self.checkpoint();
-                        ops::pixelate(&mut self.doc, 8);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Pixelate");
+                            ops::pixelate(&mut self.doc, 8);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                     if ui.button("Vignette").clicked() {
-                        self.checkpoint();
-                        ops::vignette(&mut self.doc, 0.6);
-                        self.tex = None;
+                        if self.ensure_pixel_target() {
+                            self.checkpoint("Vignette");
+                            ops::vignette(&mut self.doc, 0.6);
+                            self.tex = None;
+                        }
                         ui.close();
                     }
                 });
                 ui.menu_button("Layer", |ui| {
                     if ui.button("＋ New layer").clicked() {
-                        self.checkpoint();
+                        self.checkpoint("New layer");
                         let n = self.doc.layers.len() + 1;
                         self.doc.add_solid_layer(&format!("Layer {n}"), [0, 0, 0, 0]);
                         self.tex = None;
                         ui.close();
                     }
                     if ui.button("⧉ Merge down  (Ctrl+E)").clicked() {
-                        self.checkpoint();
-                        self.doc.merge_down();
-                        self.tex = None;
+                        if self.doc.can_merge_down() {
+                            self.checkpoint("Merge down");
+                            self.doc.merge_down();
+                            self.tex = None;
+                        } else {
+                            self.msg = "Merge down needs a pixel layer directly below.".into();
+                        }
                         ui.close();
                     }
                     if ui.button("⛶ Flatten image").clicked() {
-                        self.checkpoint();
+                        self.checkpoint("Flatten image");
                         self.doc.flatten();
                         self.tex = None;
                         ui.close();
@@ -399,17 +451,19 @@ impl PhotoStepApp {
             let mut vis_change: Option<(usize, bool)> = None;
             let mut select: Option<usize> = None;
             // snapshot to avoid borrow conflicts
-            let infos: Vec<(String, bool)> =
-                self.doc.layers.iter().map(|l| (l.name.clone(), l.visible)).collect();
+            let infos: Vec<(String, bool, bool)> = self.doc.layers.iter().map(|l| {
+                (l.name.clone(), l.visible, l.is_adjustment())
+            }).collect();
             for idx in (0..infos.len()).rev() {
-                let (nm, vis) = &infos[idx];
+                let (nm, vis, is_adj) = &infos[idx];
                 ui.horizontal(|ui| {
                     let mut v = *vis;
                     if ui.checkbox(&mut v, "").changed() {
                         vis_change = Some((idx, v));
                     }
                     let active = self.doc.active == idx;
-                    let label = format!("{} {}", if active { "▶" } else { "·" }, nm);
+                    let icon = if *is_adj { "◑" } else { "▦" };
+                    let label = format!("{} {} {}", if active { "▶" } else { "·" }, icon, nm);
                     if ui.selectable_label(active, label).clicked() {
                         select = Some(idx);
                     }
@@ -419,7 +473,7 @@ impl PhotoStepApp {
                 });
             }
             if let Some((i, v)) = vis_change {
-                self.checkpoint();
+                self.checkpoint("Toggle visibility");
                 self.doc.layers[i].visible = v;
                 self.tex = None;
             }
@@ -427,30 +481,30 @@ impl PhotoStepApp {
                 self.doc.active = i;
             }
             if let Some(i) = del {
-                self.checkpoint();
+                self.checkpoint("Delete layer");
                 self.doc.active = i;
                 self.doc.remove_active();
                 self.tex = None;
             }
             ui.horizontal(|ui| {
                 if ui.button("＋ Add").clicked() {
-                    self.checkpoint();
+                    self.checkpoint("New layer");
                     let k = self.doc.layers.len() + 1;
                     self.doc.add_solid_layer(&format!("Layer {k}"), [0, 0, 0, 0]);
                     self.tex = None;
                 }
                 if ui.button("⧉ Dup").clicked() {
-                    self.checkpoint();
+                    self.checkpoint("Duplicate layer");
                     self.doc.duplicate_active();
                     self.tex = None;
                 }
                 if ui.button("▲").clicked() {
-                    self.checkpoint();
+                    self.checkpoint("Move layer");
                     self.doc.move_active(true);
                     self.tex = None;
                 }
                 if ui.button("▼").clicked() {
-                    self.checkpoint();
+                    self.checkpoint("Move layer");
                     self.doc.move_active(false);
                     self.tex = None;
                 }
@@ -466,7 +520,7 @@ impl PhotoStepApp {
                 ui.horizontal(|ui| {
                     ui.label("Opacity");
                     if ui.add(egui::Slider::new(&mut op, 0.0..=1.0)).changed() {
-                        self.checkpoint();
+                        self.checkpoint("Layer opacity");
                         self.doc.layers[a].opacity = op;
                         self.tex = None;
                     }
@@ -476,7 +530,7 @@ impl PhotoStepApp {
                     .show_ui(ui, |ui| {
                         for m in BlendMode::all() {
                             if ui.selectable_value(&mut blend, *m, m.name()).changed() {
-                                self.checkpoint();
+                                self.checkpoint("Blend mode");
                                 self.doc.layers[a].blend = blend;
                                 self.tex = None;
                             }
@@ -499,19 +553,23 @@ impl PhotoStepApp {
             ui.add(egui::Slider::new(&mut self.blur, 1..=24).text("Blur radius"));
             ui.horizontal(|ui| {
                 if ui.button("Apply B/C/S").clicked() {
-                    self.checkpoint();
-                    if self.bri != 0 { ops::brightness(&mut self.doc, self.bri); }
-                    if self.con.abs() > 0.01 { ops::contrast(&mut self.doc, self.con); }
-                    if (self.sat - 1.0).abs() > 0.01 { ops::hue_saturation(&mut self.doc, 0.0, self.sat); }
-                    if self.exp.abs() > 0.01 { ops::exposure(&mut self.doc, self.exp); }
-                    self.tex = None;
-                    dirty = true;
+                    if self.ensure_pixel_target() {
+                        self.checkpoint("Adjust brightness/contrast");
+                        if self.bri != 0 { ops::brightness(&mut self.doc, self.bri); }
+                        if self.con.abs() > 0.01 { ops::contrast(&mut self.doc, self.con); }
+                        if (self.sat - 1.0).abs() > 0.01 { ops::hue_saturation(&mut self.doc, 0.0, self.sat); }
+                        if self.exp.abs() > 0.01 { ops::exposure(&mut self.doc, self.exp); }
+                        self.tex = None;
+                        dirty = true;
+                    }
                 }
                 if ui.button("Blur").clicked() {
-                    self.checkpoint();
-                    ops::gaussian_blur(&mut self.doc, self.blur);
-                    self.tex = None;
-                    dirty = true;
+                    if self.ensure_pixel_target() {
+                        self.checkpoint("Gaussian blur");
+                        ops::gaussian_blur(&mut self.doc, self.blur);
+                        self.tex = None;
+                        dirty = true;
+                    }
                 }
             });
             if dirty {
@@ -546,8 +604,9 @@ impl PhotoStepApp {
                 };
                 if resp.drag_started() {
                     self.painting = true;
-                    if matches!(self.tool, Tool::Brush | Tool::Eraser) {
-                        self.checkpoint();
+                    if matches!(self.tool, Tool::Brush | Tool::Eraser) && self.ensure_pixel_target() {
+                        let label = if matches!(self.tool, Tool::Eraser) { "Eraser" } else { "Brush" };
+                        self.checkpoint(label);
                     }
                     if let Some(p) = resp.interact_pointer_pos() {
                         let ip = to_img(p);
@@ -588,34 +647,39 @@ impl PhotoStepApp {
                             match self.tool {
                                 Tool::Eyedropper => {
                                     let o = ((iy as u32 * self.doc.width + ix as u32) * 4) as usize;
-                                    let px = &self.doc.active_layer().pixels[o..o + 4];
-                                    self.color = Color32::from_rgb(px[0], px[1], px[2]);
-                                    self.msg = format!("Picked rgb({},{},{})", px[0], px[1], px[2]);
+                                    let layer = self.doc.active_layer();
+                                    if layer.pixels.len() >= o + 4 {
+                                        let px = &layer.pixels[o..o + 4];
+                                        self.color = Color32::from_rgb(px[0], px[1], px[2]);
+                                        self.msg = format!("Picked rgb({},{},{})", px[0], px[1], px[2]);
+                                    } else {
+                                        self.msg = "Nothing to pick on this layer.".into();
+                                    }
                                 }
                                 Tool::Fill => {
-                                    self.checkpoint();
-                                    let c = [self.color.r(), self.color.g(), self.color.b(), 255];
-                                    // fill selection or whole layer
-                                    if let Some(s) = self.sel {
-                                        let layer = self.doc.active_layer_mut();
-                                        let x0 = s.min.x.floor().max(0.0) as u32;
-                                        let y0 = s.min.y.floor().max(0.0) as u32;
-                                        let x1 = (s.max.x.ceil().min(layer.width as f32)) as u32;
-                                        let y1 = (s.max.y.ceil().min(layer.height as f32)) as u32;
-                                        for y in y0..y1 {
-                                            for x in x0..x1 {
-                                                let inside = match self.tool {
-                                                    _ => true,
-                                                };
-                                                let _ = inside;
-                                                let o = ((y * layer.width + x) * 4) as usize;
-                                                layer.pixels[o..o + 4].copy_from_slice(&c);
+                                    if self.ensure_pixel_target() {
+                                        self.checkpoint("Fill");
+                                        let c = [self.color.r(), self.color.g(), self.color.b(), 255];
+                                        // fill selection or whole layer
+                                        if let Some(s) = self.sel {
+                                            let layer = self.doc.active_layer_mut();
+                                            let x0 = s.min.x.floor().max(0.0) as u32;
+                                            let y0 = s.min.y.floor().max(0.0) as u32;
+                                            let x1 = (s.max.x.ceil().min(layer.width as f32)) as u32;
+                                            let y1 = (s.max.y.ceil().min(layer.height as f32)) as u32;
+                                            for y in y0..y1 {
+                                                for x in x0..x1 {
+                                                    let o = ((y * layer.width + x) * 4) as usize;
+                                                    if o + 4 <= layer.pixels.len() {
+                                                        layer.pixels[o..o + 4].copy_from_slice(&c);
+                                                    }
+                                                }
                                             }
+                                        } else {
+                                            self.doc.active_layer_mut().fill(c);
                                         }
-                                    } else {
-                                        self.doc.active_layer_mut().fill(c);
+                                        self.tex = None;
                                     }
-                                    self.tex = None;
                                 }
                                 _ => {}
                             }
