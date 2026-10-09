@@ -29,27 +29,23 @@ pub enum Tool {
 impl Tool {
     fn name(self) -> &'static str {
         match self {
-            Tool::Move => "✥ Move (V)",
-            Tool::Brush => "🖌 Brush (B)",
-            Tool::Eraser => "⌫ Eraser (E)",
-            Tool::CloneStamp => "🖨 Clone (S)",
-            Tool::Fill => "🪣 Fill (G)",
-            Tool::Gradient => "🌈 Gradient",
-            Tool::Eyedropper => "💧 Picker (I)",
-            Tool::SelectRect => "▭ Rect Sel (M)",
-            Tool::SelectEllipse => "◯ Ellipse Sel",
-            Tool::MagicWand => "🪄 Wand (W)",
-            Tool::ShapeRect => "▢ Shape Rect",
-            Tool::ShapeEllipse => "⬭ Shape Ellipse",
-            Tool::ShapeLine => "╱ Shape Line",
-            Tool::Crop => "✂ Crop (C)",
-            Tool::Zoom => "🔍 Zoom (Z)",
+            Tool::Move => "Move (V)",
+            Tool::Brush => "Brush (B)",
+            Tool::Eraser => "Eraser (E)",
+            Tool::CloneStamp => "Clone (S)",
+            Tool::Fill => "Fill (G)",
+            Tool::Gradient => "Gradient",
+            Tool::Eyedropper => "Picker (I)",
+            Tool::SelectRect => "Rect Select (M)",
+            Tool::SelectEllipse => "Ellipse Select",
+            Tool::MagicWand => "Wand (W)",
+            Tool::ShapeRect => "Shape Rect",
+            Tool::ShapeEllipse => "Shape Ellipse",
+            Tool::ShapeLine => "Shape Line",
+            Tool::Crop => "Crop (C)",
+            Tool::Zoom => "Zoom (Z)",
         }
     }
-    fn all() -> &'static [Tool] {
-        &[Tool::Move, Tool::Brush, Tool::Eraser, Tool::CloneStamp, Tool::Fill, Tool::Gradient, Tool::Eyedropper, Tool::SelectRect, Tool::SelectEllipse, Tool::MagicWand, Tool::ShapeRect, Tool::ShapeEllipse, Tool::ShapeLine, Tool::Crop, Tool::Zoom]
-    }
-
     fn tip(self) -> &'static str {
         match self {
             Tool::Move => "Drag to move the active layer (V)",
@@ -71,6 +67,186 @@ impl Tool {
     }
 }
 
+// ---------- Hand-drawn toolbox icons (brand palette, no emoji) ----------
+
+fn lerp_brand(a: Color32, b: Color32, t: f32) -> Color32 {
+    Color32::from_rgb(
+        (a.r() as f32 + (b.r() as f32 - a.r() as f32) * t).round() as u8,
+        (a.g() as f32 + (b.g() as f32 - a.g() as f32) * t).round() as u8,
+        (a.b() as f32 + (b.b() as f32 - a.b() as f32) * t).round() as u8,
+    )
+}
+
+fn dashed_line(p: &egui::Painter, a: egui::Pos2, b: egui::Pos2, stroke: egui::Stroke) {
+    let len = a.distance(b);
+    if len <= 0.0 {
+        return;
+    }
+    let (dash, gap) = (4.0, 3.0);
+    let mut t = 0.0;
+    while t < len {
+        let t0 = t / len;
+        let t1 = ((t + dash) / len).min(1.0);
+        p.line_segment([a.lerp(b, t0), a.lerp(b, t1)], stroke);
+        t += dash + gap;
+    }
+}
+
+fn dashed_rect(p: &egui::Painter, r: egui::Rect, stroke: egui::Stroke) {
+    dashed_line(p, r.left_top(), r.right_top(), stroke);
+    dashed_line(p, r.right_top(), r.right_bottom(), stroke);
+    dashed_line(p, r.right_bottom(), r.left_bottom(), stroke);
+    dashed_line(p, r.left_bottom(), r.left_top(), stroke);
+}
+
+fn dashed_circle(p: &egui::Painter, c: egui::Pos2, radius: f32, stroke: egui::Stroke) {
+    for k in 0..10 {
+        let a0 = k as f32 * 36.0_f32.to_radians();
+        let a1 = a0 + 23.0_f32.to_radians();
+        let mut prev = None;
+        for i in 0..=4 {
+            let a = a0 + (a1 - a0) * i as f32 / 4.0;
+            let pt = egui::pos2(c.x + radius * a.cos(), c.y + radius * a.sin());
+            if let Some(q) = prev {
+                p.line_segment([q, pt], stroke);
+            }
+            prev = Some(pt);
+        }
+    }
+}
+
+/// Paint a brand-style vector glyph for a tool inside `r`.
+fn paint_tool_icon(p: &egui::Painter, r: egui::Rect, tool: Tool, fg: Color32) {
+    let stroke = |w: f32| egui::Stroke::new(w, fg);
+    let c = r.center();
+    let s = r.width().min(r.height()) / 2.0;
+    let pt = |dx: f32, dy: f32| egui::pos2(c.x + dx * s, c.y + dy * s);
+    match tool {
+        Tool::Move => {
+            p.line_segment([pt(-0.7, 0.0), pt(0.7, 0.0)], stroke(2.0));
+            p.line_segment([pt(0.0, -0.7), pt(0.0, 0.7)], stroke(2.0));
+            for (dx, dy) in [(-0.7, 0.0), (0.7, 0.0), (0.0, -0.7), (0.0, 0.7)] {
+                p.circle_filled(pt(dx, dy), 2.4, fg);
+            }
+        }
+        Tool::Brush => {
+            p.line_segment([pt(-0.55, 0.55), pt(0.2, -0.2)], egui::Stroke::new(3.2, fg));
+            p.add(egui::Shape::convex_polygon(
+                vec![pt(0.2, -0.2), pt(0.65, -0.65), pt(0.05, -0.05)],
+                fg,
+                egui::Stroke::NONE,
+            ));
+        }
+        Tool::Eraser => {
+            p.add(egui::Shape::convex_polygon(
+                vec![pt(-0.6, 0.2), pt(-0.05, -0.45), pt(0.6, 0.2), pt(0.05, 0.7)],
+                fg,
+                egui::Stroke::NONE,
+            ));
+            p.line_segment([pt(-0.42, -0.06), pt(0.23, 0.44)], egui::Stroke::new(1.6, BRAND_INK_SOFT));
+            for (dx, dy) in [(-0.62, 0.62), (-0.78, 0.34)] {
+                p.circle_filled(pt(dx, dy), 1.6, fg);
+            }
+        }
+        Tool::CloneStamp => {
+            p.rect_stroke(
+                egui::Rect::from_two_pos(pt(-0.35, -0.1), pt(0.35, 0.3)),
+                2.0,
+                stroke(2.0),
+                egui::StrokeKind::Middle,
+            );
+            p.line_segment([pt(0.0, -0.1), pt(0.0, -0.55)], stroke(2.0));
+            p.line_segment([pt(-0.35, -0.55), pt(0.35, -0.55)], stroke(2.0));
+            p.line_segment([pt(-0.5, 0.62), pt(0.5, 0.62)], stroke(2.0));
+        }
+        Tool::Fill => {
+            p.line_segment([pt(-0.6, -0.15), pt(0.1, -0.15)], stroke(2.2));
+            p.line_segment([pt(-0.6, -0.15), pt(-0.35, 0.6)], stroke(2.2));
+            p.line_segment([pt(0.1, -0.15), pt(-0.15, 0.6)], stroke(2.2));
+            p.circle_filled(pt(0.45, 0.42), 3.0, BRAND_AQUA);
+        }
+        Tool::Gradient => {
+            let n = 6;
+            for i in 0..n {
+                let t0 = i as f32 / n as f32;
+                let t1 = (i + 1) as f32 / n as f32;
+                let col = lerp_brand(BRAND_ORANGE, BRAND_AMBER, t0);
+                let x0 = c.x - 0.62 * s + 1.24 * s * t0;
+                let x1 = c.x - 0.62 * s + 1.24 * s * t1;
+                p.rect_filled(
+                    egui::Rect::from_min_max(
+                        egui::pos2(x0, c.y - 0.34 * s),
+                        egui::pos2(x1, c.y + 0.34 * s),
+                    ),
+                    0.0,
+                    col,
+                );
+            }
+        }
+        Tool::Eyedropper => {
+            p.circle_filled(pt(0.05, 0.2), s * 0.4, fg);
+            p.add(egui::Shape::convex_polygon(
+                vec![pt(-0.22, -0.05), pt(0.32, -0.05), pt(0.05, -0.68)],
+                fg,
+                egui::Stroke::NONE,
+            ));
+        }
+        Tool::SelectRect => {
+            dashed_rect(
+                p,
+                egui::Rect::from_two_pos(pt(-0.6, -0.45), pt(0.6, 0.45)),
+                stroke(1.8),
+            );
+        }
+        Tool::SelectEllipse => {
+            dashed_circle(p, c, s * 0.62, stroke(1.8));
+        }
+        Tool::MagicWand => {
+            p.line_segment([pt(-0.55, 0.55), pt(0.05, -0.05)], stroke(2.6));
+            for (dx, dy, sz) in [(0.38, -0.38, 0.2), (0.62, 0.02, 0.13), (-0.02, -0.52, 0.13)] {
+                let q = pt(dx, dy);
+                let r = sz * s;
+                p.line_segment(
+                    [egui::pos2(q.x - r, q.y), egui::pos2(q.x + r, q.y)],
+                    egui::Stroke::new(1.8, BRAND_AQUA),
+                );
+                p.line_segment(
+                    [egui::pos2(q.x, q.y - r), egui::pos2(q.x, q.y + r)],
+                    egui::Stroke::new(1.8, BRAND_AQUA),
+                );
+            }
+        }
+        Tool::ShapeRect => {
+            p.rect_filled(
+                egui::Rect::from_two_pos(pt(-0.58, -0.42), pt(0.58, 0.42)),
+                3.0,
+                fg,
+            );
+        }
+        Tool::ShapeEllipse => {
+            p.circle_filled(c, s * 0.62, fg);
+        }
+        Tool::ShapeLine => {
+            p.line_segment([pt(-0.6, 0.6), pt(0.6, -0.6)], egui::Stroke::new(4.2, fg));
+        }
+        Tool::Crop => {
+            for (sx, sy) in [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)] {
+                let ex = c.x + sx * 0.62 * s;
+                let ey = c.y + sy * 0.62 * s;
+                let ix = c.x + sx * 0.3 * s;
+                let iy = c.y + sy * 0.3 * s;
+                p.line_segment([egui::pos2(ex, ey), egui::pos2(ix, ey)], stroke(2.2));
+                p.line_segment([egui::pos2(ex, ey), egui::pos2(ex, iy)], stroke(2.2));
+            }
+        }
+        Tool::Zoom => {
+            let zc = egui::pos2(c.x - 0.12 * s, c.y - 0.12 * s);
+            p.circle_stroke(zc, s * 0.48, stroke(2.2));
+            p.line_segment([pt(0.22, 0.22), pt(0.62, 0.62)], stroke(2.6));
+        }
+    }
+}
+
 /// Brush paint target: pixels or the layer mask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PaintTarget {
@@ -86,6 +262,7 @@ pub const BRAND_COPYRIGHT: &str = "© 2026 salim-slimani. All rights reserved.";
 pub const BRAND_ORANGE: Color32 = Color32::from_rgb(255, 90, 40);
 pub const BRAND_AMBER: Color32 = Color32::from_rgb(255, 176, 58);
 pub const BRAND_AQUA: Color32 = Color32::from_rgb(53, 208, 197);
+pub const BRAND_INK_SOFT: Color32 = Color32::from_rgb(20, 20, 43);
 
 /// Apply the PhotoStep visual identity: deep-ink surfaces, step-orange accents.
 fn apply_brand_theme(ctx: &egui::Context) {
@@ -899,17 +1076,17 @@ impl PhotoStepApp {
         egui::TopBottomPanel::top("menu").show(ctx, |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("🆕 New  (white 1280×800)").clicked() {
+                    if ui.button("New  (white 1280×800)").clicked() {
                         self.checkpoint("New document");
                         self.doc = Document::new(1280, 800, [255, 255, 255, 255]);
                         self.tex = None;
                         ui.close();
                     }
-                    if ui.button("📂 Open…").clicked() {
+                    if ui.button("Open…").clicked() {
                         self.open_dialog();
                         ui.close();
                     }
-                    if ui.button("💾 Save / Export…").clicked() {
+                    if ui.button("Save / Export…").clicked() {
                         self.save_dialog();
                         ui.close();
                     }
@@ -1111,9 +1288,47 @@ impl PhotoStepApp {
                 ("VIEW", &[Tool::Zoom][..]),
             ] {
                 ui.label(egui::RichText::new(group).small().weak());
-                for t in tools {
-                    ui.selectable_value(&mut self.tool, *t, t.name()).on_hover_text(t.tip());
-                }
+                egui::Grid::new(group).num_columns(2).spacing([6.0, 6.0]).show(ui, |ui| {
+                    for (i, t) in tools.iter().enumerate() {
+                        let active = self.tool == *t;
+                        let (rect, resp) =
+                            ui.allocate_exact_size(Vec2::new(46.0, 42.0), egui::Sense::click());
+                        if active {
+                            ui.painter().rect_filled(
+                                rect,
+                                8.0,
+                                Color32::from_rgba_unmultiplied(255, 90, 40, 38),
+                            );
+                            ui.painter().rect_stroke(
+                                rect,
+                                8.0,
+                                egui::Stroke::new(1.5, BRAND_ORANGE),
+                                egui::StrokeKind::Middle,
+                            );
+                        } else if resp.hovered() {
+                            ui.painter().rect_filled(
+                                rect,
+                                8.0,
+                                Color32::from_rgba_unmultiplied(255, 255, 255, 14),
+                            );
+                        }
+                        let fg = if active {
+                            BRAND_ORANGE
+                        } else if resp.hovered() {
+                            Color32::WHITE
+                        } else {
+                            Color32::from_rgb(154, 154, 176)
+                        };
+                        paint_tool_icon(ui.painter(), rect.shrink2(Vec2::new(10.0, 8.0)), *t, fg);
+                        if resp.clicked() {
+                            self.tool = *t;
+                        }
+                        resp.on_hover_text(format!("{}\n{}", t.name(), t.tip()));
+                        if i % 2 == 1 {
+                            ui.end_row();
+                        }
+                    }
+                });
             }
             ui.separator();
             ui.label("Brush size");
@@ -1383,7 +1598,7 @@ impl PhotoStepApp {
             }
             self.tex = None;
         }
-        if ui.button("🗑 Delete adjustment").clicked() {
+        if ui.button("Delete adjustment").clicked() {
             self.checkpoint("Delete layer");
             self.doc.remove_active();
             self.tex = None;
@@ -1834,7 +2049,7 @@ impl eframe::App for PhotoStepApp {
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(format!("◧ {:?}", self.tool)).strong().color(BRAND_ORANGE));
-                ui.label(format!("📐 {}×{}  •  {} layers  •  🔍 {:.0}%",
+                ui.label(format!("{}×{}  •  {} layers  •  {:.0}%",
                     self.doc.width, self.doc.height, self.doc.layers.len(), self.zoom * 100.0));
                 ui.separator();
                 ui.label(&self.msg);
