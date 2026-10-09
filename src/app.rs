@@ -265,8 +265,10 @@ pub const BRAND_AQUA: Color32 = Color32::from_rgb(53, 208, 197);
 pub const BRAND_INK_SOFT: Color32 = Color32::from_rgb(20, 20, 43);
 
 /// Apply the PhotoStep visual identity: deep-ink surfaces, step-orange accents.
+/// Always starts from the dark theme so the studio looks identical on every OS.
 fn apply_brand_theme(ctx: &egui::Context) {
     let mut style = (*ctx.style()).clone();
+    style.visuals = egui::Visuals::dark();
     style.visuals.panel_fill = Color32::from_rgb(24, 24, 40);
     style.visuals.window_fill = Color32::from_rgb(28, 28, 46);
     style.visuals.faint_bg_color = Color32::from_rgb(37, 37, 60);
