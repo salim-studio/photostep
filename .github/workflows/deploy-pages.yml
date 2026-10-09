@@ -1,0 +1,72 @@
+# Builds the PhotoStep web app (WebAssembly) and deploys it to GitHub Pages:
+# https://salim-studio.github.io/photostep/
+#
+# The pipeline is entirely from source (no prebuilt binaries):
+#   cargo build (wasm32) -> wasm-bindgen JS glue -> static dist/ -> Pages.
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (wasm target included)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: photostep-wasm
+
+      - name: Build WebAssembly
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Install matching wasm-bindgen-cli
+        run: |
+          WBV=$(grep -A2 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | cut -d'"' -f2)
+          echo "wasm-bindgen lib version: $WBV"
+          cargo install wasm-bindgen-cli --vers "$WBV"
+
+      - name: Generate site
+        run: |
+          mkdir -p dist/assets
+          wasm-bindgen --target web --out-dir dist --out-name photostep \
+            target/wasm32-unknown-unknown/release/photostep.wasm
+          cp web/index.html dist/index.html
+          cp assets/logo.svg dist/assets/logo.svg
+          ls -la dist dist/assets
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
