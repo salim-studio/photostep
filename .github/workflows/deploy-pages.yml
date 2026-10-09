@@ -52,6 +52,7 @@ jobs:
           wasm-bindgen --target web --out-dir dist --out-name photostep \
             target/wasm32-unknown-unknown/release/photostep.wasm
           cp web/index.html dist/index.html
+          cp web/manifest.json dist/manifest.json
           cp assets/logo.svg dist/assets/logo.svg
           ls -la dist dist/assets
 

@@ -1,3 +1,4 @@
+//! Copyright (c) 2026 salim-slimani. Licensed under MIT. See LICENSE-MIT.
 //! PhotoStep core: document, layers, blending, masks, adjustments, effects, history.
 //! Designed for speed: flat RGBA8 buffers + rayon parallelism in ops,
 //! cheap snapshots with a bounded, labeled history stack.

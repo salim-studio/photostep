@@ -8,6 +8,14 @@
 Non-destructive adjustments, masks, styles, pro tools and real PSD files —<br/>
 on the desktop, in the browser, and on the command line.</p>
 
+<p align="center">
+  <a href="https://github.com/salim-studio/photostep/actions/workflows/deploy-pages.yml"><img src="https://github.com/salim-studio/photostep/actions/workflows/deploy-pages.yml/badge.svg" alt="Pages build status" /></a>
+  <a href="https://salim-studio.github.io/photostep/"><img src="https://img.shields.io/badge/demo-live-FF5A28?logo=googlechrome&logoColor=white" alt="Live demo" /></a>
+  <img src="https://img.shields.io/badge/version-0.2.0-FFB03A" alt="Version 0.2.0" />
+  <img src="https://img.shields.io/badge/license-MIT-35D0C5" alt="MIT license" />
+  <img src="https://img.shields.io/badge/100%25_Rust-74105e?logo=rust" alt="100% Rust" />
+</p>
+
 ## Brand
 
 | Token | Value |

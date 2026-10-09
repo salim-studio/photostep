@@ -1,3 +1,4 @@
+//! Copyright (c) 2026 salim-slimani. Licensed under MIT. See LICENSE-MIT.
 //! PhotoStep ops: fast parallel adjustments, filters, transforms.
 //! All pixel loops use rayon for multi-core speed.
 //!

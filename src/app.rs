@@ -1,3 +1,4 @@
+//! Copyright (c) 2026 salim-slimani. Licensed under MIT. See LICENSE-MIT.
 //! PhotoStep desktop app: layer-based editor layout in egui/eframe.
 //! Left: toolbox. Center: canvas. Right: layers + adjustments. Top: menu. Bottom: status.
 

@@ -1,3 +1,4 @@
+//! Copyright (c) 2026 salim-slimani. Licensed under MIT. See LICENSE-MIT.
 //! PhotoStep IO: images + PSD + native .pstep project files.
 
 use anyhow::{Context, Result};

@@ -1,0 +1,17 @@
+{
+  "name": "PhotoStep",
+  "short_name": "PhotoStep",
+  "description": "Fast layer-based image editor in pure Rust. © 2026 salim-slimani.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#14142B",
+  "theme_color": "#14142B",
+  "icons": [
+    {
+      "src": "assets/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

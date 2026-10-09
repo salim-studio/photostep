@@ -1,3 +1,4 @@
+//! Copyright (c) 2026 salim-slimani. Licensed under MIT. See LICENSE-MIT.
 //! PhotoStep — fast layer-based image editor in Rust.
 //! Desktop GUI (default): `photostep` — native window via eframe.
 //! Web: compiled to WebAssembly and served from `index.html` (see Trunk.toml).

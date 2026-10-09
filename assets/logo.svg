@@ -1,18 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="PhotoStep logo">
   <defs>
-    <linearGradient id="ps-bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2A2A52"/>
-      <stop offset="1" stop-color="#14142B"/>
+    <linearGradient id="ps-bg" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#33335E"/>
+      <stop offset="0.55" stop-color="#1E1E40"/>
+      <stop offset="1" stop-color="#121226"/>
     </linearGradient>
     <linearGradient id="ps-step" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0" stop-color="#FF5A28"/>
       <stop offset="1" stop-color="#FFB03A"/>
     </linearGradient>
+    <linearGradient id="ps-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
   </defs>
   <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#ps-bg)"/>
-  <rect x="48" y="166" width="76" height="28" rx="14" fill="url(#ps-step)" opacity="0.82"/>
-  <rect x="90" y="114" width="76" height="28" rx="14" fill="url(#ps-step)" opacity="0.92"/>
-  <rect x="132" y="62" width="76" height="28" rx="14" fill="url(#ps-step)"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#ps-sheen)"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="none" stroke="#000000" stroke-opacity="0.35" stroke-width="2"/>
+  <!-- ascending steps: every edit moves the picture forward -->
+  <rect x="46" y="164" width="76" height="28" rx="14" fill="url(#ps-step)" opacity="0.8"/>
+  <rect x="90" y="114" width="76" height="28" rx="14" fill="url(#ps-step)" opacity="0.9"/>
+  <rect x="134" y="64" width="76" height="28" rx="14" fill="url(#ps-step)"/>
+  <!-- lens dot -->
+  <circle cx="190" cy="184" r="18" fill="#0E0E20" opacity="0.45"/>
   <circle cx="190" cy="182" r="17" fill="#35D0C5"/>
-  <circle cx="190" cy="182" r="17" fill="none" stroke="#14142B" stroke-width="6" opacity="0.35"/>
+  <circle cx="190" cy="182" r="17" fill="none" stroke="#14142B" stroke-width="5" opacity="0.4"/>
+  <circle cx="184" cy="176" r="5" fill="#FFFFFF" opacity="0.65"/>
 </svg>
