@@ -52,8 +52,8 @@ fn apply_brand_theme(ctx: &egui::Context) {
     style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(255, 110, 62);
     style.visuals.widgets.active.bg_fill = BRAND_ORANGE;
     style.visuals.widgets.open.bg_fill = Color32::from_rgb(60, 60, 86);
-    style.visuals.window_rounding = egui::Rounding::same(10.0);
-    style.visuals.menu_rounding = egui::Rounding::same(8.0);
+    style.visuals.window_corner_radius = egui::CornerRadius::same(10);
+    style.visuals.menu_corner_radius = egui::CornerRadius::same(8);
     ctx.set_style(style);
 }
 
@@ -537,7 +537,7 @@ impl PhotoStepApp {
                 if let Some(s) = self.sel {
                     let p0 = rect.min + Vec2::new(s.min.x * self.zoom, s.min.y * self.zoom);
                     let p1 = rect.min + Vec2::new(s.max.x * self.zoom, s.max.y * self.zoom);
-                    ui.painter().rect_stroke(egui::Rect::from_min_max(p0.into(), p1.into()), 0.0, (1.5, Color32::YELLOW));
+                    ui.painter().rect_stroke(egui::Rect::from_min_max(p0.into(), p1.into()), 0.0, (1.5, Color32::YELLOW), egui::StrokeKind::Middle);
                 }
                 // interactions
                 let to_img = |p: egui::Pos2| {

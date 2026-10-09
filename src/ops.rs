@@ -368,13 +368,14 @@ pub fn add_noise(doc: &mut Document, amount: u8) {
 pub fn vignette(doc: &mut Document, strength: f32) {
     let (w, h) = (doc.width as f32, doc.height as f32);
     let s = strength.clamp(0.0, 1.0);
+    let dw = doc.width;
     let px = &mut doc.active_layer_mut().pixels;
     let cx = w / 2.0;
     let cy = h / 2.0;
     let maxd = (cx * cx + cy * cy).sqrt();
     px.par_chunks_exact_mut(4).enumerate().for_each(|(i, p)| {
-        let x = (i as u32 % doc.width) as f32;
-        let y = (i as u32 / doc.width) as f32;
+        let x = (i as u32 % dw) as f32;
+        let y = (i as u32 / dw) as f32;
         let d = ((x - cx).powi(2) + (y - cy).powi(2)).sqrt() / maxd;
         let m = 1.0 - s * d * d;
         for c in 0..3 {
