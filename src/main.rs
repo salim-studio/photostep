@@ -1,4 +1,4 @@
-//! PhotoStep — Photoshop-like editor in Rust: fast + practical.
+//! PhotoStep — fast layer-based image editor in Rust.
 //! GUI (default): `photostep` or `photostep gui`
 //! Headless: `photostep --input in.png --out out.png --op "brightness:20" --op "blur:4"`
 
@@ -10,7 +10,7 @@ mod ops;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "photostep", version, about = "PhotoStep — fast Photoshop-like editor in Rust")]
+#[command(name = "photostep", version, about = "PhotoStep — fast layer-based image editor in Rust")]
 struct Cli {
     /// input image (if omitted → launch GUI)
     #[arg(long)]
@@ -95,7 +95,7 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "PhotoStep — fast Photoshop in Rust",
+        "PhotoStep",
         opts,
         Box::new(|cc| Ok(Box::new(app::PhotoStepApp::new(cc)))),
     )

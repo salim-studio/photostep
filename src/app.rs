@@ -1,4 +1,4 @@
-//! PhotoStep desktop app: Photoshop-like layout in egui/eframe.
+//! PhotoStep desktop app: layer-based editor layout in egui/eframe.
 //! Left: toolbox. Center: canvas. Right: layers + adjustments. Top: menu. Bottom: status.
 
 use egui::{Color32, TextureHandle, Vec2};
@@ -36,6 +36,27 @@ impl Tool {
     }
 }
 
+// ---------- PhotoStep brand identity ----------
+pub const BRAND_NAME: &str = "PhotoStep";
+pub const BRAND_VERSION: &str = "0.1.0";
+pub const BRAND_COPYRIGHT: &str = "© 2026 salim-slimani. All rights reserved.";
+pub const BRAND_ORANGE: Color32 = Color32::from_rgb(255, 90, 40);
+pub const BRAND_AMBER: Color32 = Color32::from_rgb(255, 176, 58);
+pub const BRAND_AQUA: Color32 = Color32::from_rgb(53, 208, 197);
+
+/// Apply the PhotoStep visual identity: dark ink surfaces, step-orange accents.
+fn apply_brand_theme(ctx: &egui::Context) {
+    let mut style = (*ctx.style()).clone();
+    style.visuals.selection.bg_fill = BRAND_ORANGE;
+    style.visuals.selection.stroke = egui::Stroke::new(1.0, Color32::WHITE);
+    style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(255, 110, 62);
+    style.visuals.widgets.active.bg_fill = BRAND_ORANGE;
+    style.visuals.widgets.open.bg_fill = Color32::from_rgb(60, 60, 86);
+    style.visuals.window_rounding = egui::Rounding::same(10.0);
+    style.visuals.menu_rounding = egui::Rounding::same(8.0);
+    ctx.set_style(style);
+}
+
 pub struct PhotoStepApp {
     doc: Document,
     history: History,
@@ -49,6 +70,7 @@ pub struct PhotoStepApp {
     sel: Option<egui::Rect>, // in image pixels
     sel_start: Option<(f32, f32)>,
     msg: String,
+    show_about: bool,
     // sliders
     bri: i16,
     con: f32,
@@ -58,7 +80,8 @@ pub struct PhotoStepApp {
 }
 
 impl PhotoStepApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        apply_brand_theme(&cc.egui_ctx);
         Self {
             doc: Document::new(1280, 800, [45, 45, 48, 255]),
             history: History::new(30),
@@ -67,11 +90,12 @@ impl PhotoStepApp {
             zoom: 0.6,
             tool: Tool::Brush,
             brush_size: 24.0,
-            color: Color32::from_rgb(255, 90, 40),
+            color: BRAND_ORANGE,
             painting: false,
             sel: None,
             sel_start: None,
             msg: "Ready — File › Open an image, or paint on the canvas.".into(),
+            show_about: false,
             bri: 0, con: 0.0, sat: 1.0, exp: 0.0, blur: 4,
         }
     }
@@ -321,12 +345,23 @@ impl PhotoStepApp {
                         ui.close();
                     }
                 });
+                ui.menu_button("Help", |ui| {
+                    if ui.button("★ About PhotoStep").clicked() {
+                        self.show_about = true;
+                        ui.close();
+                    }
+                });
             });
         });
     }
 
     fn left_tools(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tools").exact_width(148.0).show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.label(egui::RichText::new("◧ PHOTOSTEP").size(17.0).strong().color(BRAND_ORANGE));
+                ui.label(egui::RichText::new(format!("v{}", BRAND_VERSION)).small().weak());
+            });
+            ui.separator();
             ui.heading("Tools");
             for t in Tool::all() {
                 ui.selectable_value(&mut self.tool, *t, t.name());
@@ -592,6 +627,24 @@ impl eframe::App for PhotoStepApp {
         self.menu_bar(ctx);
         self.left_tools(ctx);
         self.right_panels(ctx);
+        if self.show_about {
+            egui::Window::new("About PhotoStep")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(egui::RichText::new("◧ PHOTOSTEP").size(26.0).strong().color(BRAND_ORANGE));
+                        ui.label("Fast layer-based image editor in pure Rust.");
+                        ui.add_space(6.0);
+                        ui.label(format!("Version {}", BRAND_VERSION));
+                        ui.label(BRAND_COPYRIGHT);
+                        ui.add_space(8.0);
+                        if ui.button("Close").clicked() {
+                            self.show_about = false;
+                        }
+                    });
+                });
+        }
         egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("📐 {}×{}  •  {} layers  •  🔍 {:.0}%  •  🖌 {:?}",
