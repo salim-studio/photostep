@@ -24,12 +24,12 @@ anyhow = "1"
 log = "0.4"
 psd = "0.3"
 kamadak-exif = "0.5"
+# sync dialogs on desktop, async dialogs on web (WASM32 supported)
+rfd = "0.17"
 
-# native-only: blocking file dialogs (the web build uses a placeholder message)
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rfd = "0.15"
-
-# web-only: WASM bindings to boot the egui app in the browser canvas
+# web-only: WASM bindings to boot the egui app in the browser canvas,
+# plus async file tasks polled each frame
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
 web-sys = "0.3"
+poll-promise = { version = "0.3", default-features = false, features = ["web"] }

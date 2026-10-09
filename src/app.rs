@@ -145,6 +145,11 @@ pub struct PhotoStepApp {
     scale_x: f32,
     scale_y: f32,
     rot_deg: f32,
+    // web-only: in-flight async file picker tasks, polled each frame
+    #[cfg(target_arch = "wasm32")]
+    open_pending: Option<poll_promise::Promise<Option<(String, Vec<u8>)>>>,
+    #[cfg(target_arch = "wasm32")]
+    save_pending: Option<poll_promise::Promise<Option<String>>>,
     msg: String,
     show_about: bool,
     // sliders
@@ -187,6 +192,10 @@ impl PhotoStepApp {
             scale_x: 100.0,
             scale_y: 100.0,
             rot_deg: 0.0,
+            #[cfg(target_arch = "wasm32")]
+            open_pending: None,
+            #[cfg(target_arch = "wasm32")]
+            save_pending: None,
             msg: "Ready — File › Open an image, or paint on the canvas.".into(),
             show_about: false,
             bri: 0, con: 0.0, sat: 1.0, exp: 0.0, blur: 4,
@@ -755,7 +764,25 @@ impl PhotoStepApp {
 
     #[cfg(target_arch = "wasm32")]
     fn open_dialog(&mut self) {
-        self.msg = "File dialogs need the desktop build — the web demo starts from a blank canvas.".into();
+        if self.open_pending.is_some() {
+            return;
+        }
+        let dialog = rfd::AsyncFileDialog::new().add_filter(
+            "images",
+            &["png", "jpg", "jpeg", "webp", "gif", "bmp", "tiff", "tif", "qoi", "psd"],
+        );
+        let promise = poll_promise::Promise::spawn_local(async move {
+            match dialog.pick_file().await {
+                Some(file) => {
+                    let name = file.file_name();
+                    let bytes = file.read().await;
+                    Some((name, bytes))
+                }
+                None => None,
+            }
+        });
+        self.open_pending = Some(promise);
+        self.msg = "Choose an image file…".into();
     }
 
     fn open_path(&mut self, s: &str) {
@@ -803,7 +830,69 @@ impl PhotoStepApp {
 
     #[cfg(target_arch = "wasm32")]
     fn save_dialog(&mut self) {
-        self.msg = "Saving files needs the desktop build — the web demo is for trying the tools.".into();
+        if self.save_pending.is_some() {
+            self.msg = "Export already in progress…".into();
+            return;
+        }
+        let png = match io::encode_png(&self.doc) {
+            Ok(p) => p,
+            Err(e) => {
+                self.msg = format!("Export failed: {e:#}");
+                return;
+            }
+        };
+        let dialog = rfd::AsyncFileDialog::new().set_file_name("photostep.png");
+        let promise = poll_promise::Promise::spawn_local(async move {
+            match dialog.save_file().await {
+                // the browser prompts where to save on write
+                Some(file) => match file.write(&png).await {
+                    Ok(()) => Some("Exported — check your downloads.".to_string()),
+                    Err(e) => Some(format!("Export failed: {e:?}")),
+                },
+                None => None,
+            }
+        });
+        self.save_pending = Some(promise);
+        self.msg = "Choose where to save…".into();
+    }
+
+    /// Poll completed browser file tasks (web only; called every frame).
+    #[cfg(target_arch = "wasm32")]
+    fn poll_web_files(&mut self) {
+        if let Some(p) = self.open_pending.take() {
+            match p.try_take() {
+                Ok(Some((name, bytes))) => {
+                    let lower = name.to_lowercase();
+                    let r = if lower.ends_with(".psd") {
+                        io::load_psd_bytes(&bytes)
+                    } else {
+                        io::load_image_bytes(&bytes, &name)
+                    };
+                    match r {
+                        Ok(d) => {
+                            self.checkpoint("Open");
+                            let (w, h) = (d.width, d.height);
+                            self.doc = d;
+                            self.clear_selection();
+                            self.tex = None;
+                            self.zoom =
+                                (700.0 / w as f32).min(900.0 / h as f32).clamp(0.1, 2.0);
+                            self.msg = format!("Opened {name} — {w}×{h}");
+                        }
+                        Err(e) => self.msg = format!("Could not open {name}: {e:#}"),
+                    }
+                }
+                Ok(None) => self.msg = "Open cancelled.".into(),
+                Err(p) => self.open_pending = Some(p),
+            }
+        }
+        if let Some(p) = self.save_pending.take() {
+            match p.try_take() {
+                Ok(Some(m)) => self.msg = m,
+                Ok(None) => self.msg = "Export cancelled.".into(),
+                Err(p) => self.save_pending = Some(p),
+            }
+        }
     }
 
     fn menu_bar(&mut self, ctx: &egui::Context) {
@@ -1719,6 +1808,8 @@ impl PhotoStepApp {
 
 impl eframe::App for PhotoStepApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        #[cfg(target_arch = "wasm32")]
+        self.poll_web_files();
         self.menu_bar(ctx);
         self.left_tools(ctx);
         self.right_panels(ctx);

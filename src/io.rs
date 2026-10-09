@@ -9,13 +9,28 @@ use crate::core::{BlendMode, Document, Layer};
 /// resamples nothing — pixels stay exactly as decoded.
 pub fn load_image(path: &str) -> Result<Document> {
     let bytes = std::fs::read(path).with_context(|| format!("cannot read {path}"))?;
-    let decoded = image::load_from_memory(&bytes).with_context(|| format!("cannot decode {path}"))?;
-    let img = apply_exif_orientation(decoded, &bytes);
+    load_image_bytes(&bytes, path)
+}
+
+/// Decode image bytes (file picker, browser upload, tests) into a document.
+pub fn load_image_bytes(bytes: &[u8], name: &str) -> Result<Document> {
+    let decoded = image::load_from_memory(bytes).with_context(|| format!("cannot decode {name}"))?;
+    let img = apply_exif_orientation(decoded, bytes);
     let (w, h) = (img.width(), img.height());
     let mut doc = Document::new(w, h, [0, 0, 0, 0]);
     doc.layers[0].name = "Background".into();
     doc.layers[0].pixels = img.into_raw();
     Ok(doc)
+}
+
+/// Encode the flattened composite as PNG bytes (browser download).
+pub fn encode_png(doc: &Document) -> Result<Vec<u8>> {
+    use image::ImageEncoder as _;
+    let flat = doc.composite();
+    let mut out = Vec::new();
+    let mut enc = image::codecs::png::PngEncoder::new(&mut out);
+    enc.write_image(&flat, doc.width, doc.height, image::ExtendedColorType::Rgba8)?;
+    Ok(out)
 }
 
 /// Honor the EXIF orientation flag (phones store rotation here instead of

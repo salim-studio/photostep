@@ -105,8 +105,8 @@ trunk serve   # local preview at http://127.0.0.1:8080
 ```
 
 Live demo: **https://salim-studio.github.io/photostep/** (auto-deployed from
-`main` via GitHub Actions). The web demo starts from a blank canvas; file
-open/save needs the desktop build.
+`main` via GitHub Actions). The web demo opens images and PSDs and exports
+PNG, right in the browser.
 
 ### 4) Batch processing (no GUI)
 
