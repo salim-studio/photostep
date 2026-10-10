@@ -2027,6 +2027,10 @@ impl PhotoStepApp {
 
 impl eframe::App for PhotoStepApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // eframe re-applies the OS theme and wipes custom visuals: re-assert ours.
+        if !ctx.style().visuals.dark_mode {
+            apply_brand_theme(ctx);
+        }
         #[cfg(target_arch = "wasm32")]
         self.poll_web_files();
         self.menu_bar(ctx);

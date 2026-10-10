@@ -21,6 +21,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The desktop/CLI code (cfg-gated) is never compiled by the wasm build,
+  # so check it natively too — catches errors in rfd dialogs, CLI, PSD fs IO.
+  check-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: photostep-native
+
+      - name: Install Linux GUI deps
+        run: >
+          sudo apt-get update &&
+          sudo apt-get install -y libxkbcommon-dev libxcb-render0-dev
+          libxcb-shape0-dev libxcb-xfixes0-dev libxrandr-dev libxcursor-dev
+          libxi-dev libgl1-mesa-dev libwayland-dev pkg-config
+
+      - name: Check desktop build
+        run: cargo check --tests
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -71,3 +97,50 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # Screenshot the LIVE production site (headless Chromium + SwiftShader WebGL)
+  # so regressions are visible as an artifact, without needing a local GPU.
+  screenshot:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright + Chromium
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Capture production site
+        run: |
+          cat > shot.py <<'EOF'
+          import asyncio
+          from playwright.async_api import async_playwright
+
+          async def main():
+              async with async_playwright() as pw:
+                  browser = await pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
+                  page = await browser.new_page(viewport={"width": 1440, "height": 900})
+                  logs = []
+                  page.on("console", lambda m: logs.append(f"{m.type}: {m.text}"))
+                  page.on("pageerror", lambda e: logs.append(f"PAGEERROR: {e}"))
+                  await page.goto("https://salim-studio.github.io/photostep/", wait_until="networkidle")
+                  await page.wait_for_timeout(15000)
+                  await page.screenshot(path="site.png")
+                  print("CONSOLE LOGS:")
+                  for line in logs[:50]:
+                      print(" ", line)
+                  await browser.close()
+
+          asyncio.run(main())
+          EOF
+          python shot.py
+
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-screenshot
+          path: site.png
