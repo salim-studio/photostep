@@ -131,8 +131,10 @@ fn paint_tool_icon(p: &egui::Painter, r: egui::Rect, tool: Tool, fg: Color32) {
         }
         Tool::Brush => {
             p.line_segment([pt(-0.55, 0.55), pt(0.2, -0.2)], egui::Stroke::new(3.2, fg));
+            // solid tip triangle (must have real area: degenerate polygons
+            // make tessellators emit stray streaks on some GPUs)
             p.add(egui::Shape::convex_polygon(
-                vec![pt(0.2, -0.2), pt(0.65, -0.65), pt(0.05, -0.05)],
+                vec![pt(0.65, -0.65), pt(0.264, -0.136), pt(0.136, -0.264)],
                 fg,
                 egui::Stroke::NONE,
             ));
