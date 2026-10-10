@@ -1299,7 +1299,7 @@ impl PhotoStepApp {
                             ui.painter().rect_filled(
                                 rect,
                                 8.0,
-                                Color32::from_rgba_unmultiplied(255, 90, 40, 38),
+                                Color32::from_rgb(66, 30, 20),
                             );
                             ui.painter().rect_stroke(
                                 rect,
@@ -1311,7 +1311,7 @@ impl PhotoStepApp {
                             ui.painter().rect_filled(
                                 rect,
                                 8.0,
-                                Color32::from_rgba_unmultiplied(255, 255, 255, 14),
+                                Color32::from_rgb(38, 38, 58),
                             );
                         }
                         let fg = if active {
@@ -1766,14 +1766,16 @@ impl PhotoStepApp {
                 ui.painter().rect_filled(rect.expand(10.0), 12.0, Color32::from_rgba_unmultiplied(0, 0, 0, 90));
                 ui.painter().rect_filled(rect, 0.0, Color32::from_gray(32));
                 ui.painter().image(tex.id(), rect, egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)), Color32::WHITE);
-                // selection overlay
+                // selection overlay (skipped when degenerate to avoid streaks)
                 if let Some(s) = self.sel {
+                    if s.width() > 1.0 && s.height() > 1.0 {
                     let p0 = rect.min + Vec2::new(s.min.x * self.zoom, s.min.y * self.zoom);
                     let p1 = rect.min + Vec2::new(s.max.x * self.zoom, s.max.y * self.zoom);
                     ui.painter().rect_stroke(egui::Rect::from_min_max(p0.into(), p1.into()), 0.0, (1.5, Color32::YELLOW), egui::StrokeKind::Middle);
+                    }
                 }
-                // interactions (zoom copied so the helper closure doesn't borrow self)
-                let zoom = self.zoom;
+                // interactions (zoom copied and sanitized so the helper closure doesn't borrow self)
+                let zoom = self.zoom.max(0.05);
                 let to_img = |p: egui::Pos2| {
                     egui::pos2((p.x - rect.min.x) / zoom, (p.y - rect.min.y) / zoom)
                 };
