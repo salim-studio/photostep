@@ -114,6 +114,9 @@ jobs:
           pip install playwright
           python -m playwright install --with-deps chromium
 
+      - name: Let the CDN settle
+        run: sleep 90
+
       - name: Capture production site
         run: |
           cat > shot.py <<'EOF'
@@ -123,7 +126,8 @@ jobs:
           async def main():
               async with async_playwright() as pw:
                   browser = await pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-                  page = await browser.new_page(viewport={"width": 1440, "height": 900})
+                  # short viewport forces both side panels to overflow -> proves scrolling
+                  page = await browser.new_page(viewport={"width": 1440, "height": 550})
                   logs = []
                   page.on("console", lambda m: logs.append(f"{m.type}: {m.text}"))
                   page.on("pageerror", lambda e: logs.append(f"PAGEERROR: {e}"))
