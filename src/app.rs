@@ -1280,6 +1280,10 @@ impl PhotoStepApp {
 
     fn left_tools(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("tools").exact_width(148.0).show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .show(ui, |ui| {
             ui.vertical_centered(|ui| {
                 ui.label(egui::RichText::new("◧ PHOTOSTEP").size(19.0).strong().color(BRAND_ORANGE));
                 ui.label(egui::RichText::new(format!("STUDIO · v{}", BRAND_VERSION)).small().color(BRAND_AMBER));
@@ -1350,11 +1354,16 @@ impl PhotoStepApp {
             if ui.button("Fit").clicked() {
                 self.zoom = (700.0 / self.doc.width as f32).min(900.0 / self.doc.height as f32).clamp(0.1, 2.0);
             }
+            });
         });
     }
 
     fn right_panels(&mut self, ctx: &egui::Context) {
         egui::SidePanel::right("right").exact_width(264.0).show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .show(ui, |ui| {
             ui.heading("Layers");
             let mut del = None;
             let mut vis_change: Option<(usize, bool)> = None;
@@ -1495,6 +1504,7 @@ impl PhotoStepApp {
             self.mask_section(ui);
             self.styles_section(ui);
             self.transform_section(ui);
+            });
         });
     }
 
